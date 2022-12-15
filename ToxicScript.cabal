@@ -1,0 +1,40 @@
+cabal-version:      2.4
+name:               ToxicScript
+version:            0.1.0.0
+license:            Unlicense
+license-file:       LICENSE
+synopsis:           An embeddable scripting language focusing on simplicity, extensibility and safety.
+description:        An extensible embeddable scripting language, using s-expressions for syntax and Call-By-Need untyped lambda calculus for evaluation.
+author:             spikeyarmaku
+maintainer:         spikeyarmaku@gmail.com
+-- extra-doc-files:
+
+category:           Language, Scripting
+extra-source-files: CHANGELOG.md
+
+library
+    exposed-modules:    Language.ToxicScript,
+                        Language.ToxicScript.Stdlib
+    hs-source-dirs:     src
+    other-modules:      Language.ToxicScript.Parse,
+                        Language.ToxicScript.Combination,
+                        Language.ToxicScript.Expr,
+                        Language.ToxicScript.Eval,
+                        Language.ToxicScript.Env
+    default-language:   Haskell2010
+    ghc-options:        -Wall -O2
+    build-depends:      base ^>=4.14.3.0,
+                        sexpresso,
+                        text,
+                        megaparsec,
+                        containers,
+                        mtl
+    
+executable ToxicScript-test
+    main-is:            Main.hs
+    hs-source-dirs:     app
+    default-language:   Haskell2010
+    build-depends:      base ^>=4.14.3.0,
+                        ToxicScript,
+                        text,
+                        mtl

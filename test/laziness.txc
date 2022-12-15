@@ -1,0 +1,2 @@
+    ; Laziness test - should return 1
+(letrec ones (cons 1 ones) (nth 5 ones))
