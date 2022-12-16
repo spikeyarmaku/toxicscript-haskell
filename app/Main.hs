@@ -45,18 +45,21 @@ withHandler eith =
 globalEnv :: Env (Value AppValue)
 globalEnv =
     mkEnv (stringsAndNumbers ratToAppVal strToAppVal)
-        [ mkTransform "lambda"  $ const lambdaTr
-        , mkTransform "let"     $ const letTr
-        , mkTransform "letrec"  $ const letrecTr
-        , mkTransform "list"    $ const listTr
+        [ mkTransform "lambda"  lambdaTr
+        , mkTransform "let"     letTr
+        , mkTransform "letrec"  letrecTr
+        , mkTransform "list"    listTr
         , mkTransform "cons"    consTr
         , mkTransform "nth"     $ nthTr avToInt
-        , mkTransform "if"      $ const $ ifTr avToBool
-        , mkTransform "+"       $ const $ mathTr avToNum avFromNum (+)
-        , mkTransform "*"       $ const $ mathTr avToNum avFromNum (*)
-        , mkTransform "-"       $ const $ mathTr avToNum avFromNum (-)
-        , mkTransform "/"       $ const $ mathTr avToNum avFromNum (/)
-        , mkTransform "="       $ const $ eqTr avFromBool
+        , mkTransform "if"      $ ifTr avToBool
+        , mkTransform "+"       $ mathTr avToNum avFromNum (+)
+        , mkTransform "*"       $ mathTr avToNum avFromNum (*)
+        , mkTransform "-"       $ mathTr avToNum avFromNum (-)
+        -- , mkTransform "/"       $ mathTr avToNum avFromNum (/)
+        , mkTransform "="       $ eqTr avFromBool
+
+        -- , mkConstant "pi"       $ VRat 3.141592653589
+        , (List [], emptyTr)
         ]
 
 strToAppVal :: T.Text -> Value AppValue

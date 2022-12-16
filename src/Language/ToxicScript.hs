@@ -21,7 +21,9 @@ import Language.ToxicScript.Parse
 
 import Language.ToxicScript.Eval
     ( Value (..)
+    , Eval
     , eval
+    , callTransform
     , mkTransform
     )
 
@@ -35,3 +37,5 @@ import Language.ToxicScript.Env
     )
 
 import Language.ToxicScript.Expr
+
+-- TODO write mkSyntax and mkFunction

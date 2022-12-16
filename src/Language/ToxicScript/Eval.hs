@@ -19,15 +19,12 @@ data Value a
     | Promise (Env (Value a)) Expr
     | Opaque a
 
-mkTransform :: String -> (Expr -> Value a) -> (Expr, Value a)
-mkTransform name tr = (mkSymbol name, tr (mkSymbol name))
+callTransform :: Value a -> Env (Value a) -> [Expr] -> Eval (Value a)
+callTransform (Transform tr) env args = tr env args
+callTransform _ _ _ = throwError "Not a transform"
 
-getVal :: Value a -> Maybe a
-getVal (Opaque a) = Just a
-getVal _ = Nothing
-
-mkOpaque :: a -> Value a
-mkOpaque = Opaque
+mkTransform :: String -> Value a -> (Expr, Value a)
+mkTransform name tr = (mkSymbol name, tr)
 
 instance Show (Value a) where
     show (Transform _) = "<<Transform>>"
@@ -37,7 +34,7 @@ instance Show (Value a) where
 eval :: Env (Value a) -> Expr -> Eval (Value a)
 eval env expr = do
     -- Check if the expression has a value assigned to it
-    logStr $ "Evaluating: " ++ show expr
+    logStr $ "Evaluating: `" ++ show expr ++ "`"
     case lookupEnv env expr of
         Nothing -> do
             -- If not, check if it is a valid combination
@@ -49,10 +46,7 @@ eval env expr = do
                         Right (combiner, params) ->
                             evalCombination env combiner params
                 else throwError $ "No value assigned to " ++ show expr
-        Just v -> do
-            case v of
-                Promise env' expr' -> eval env' expr'
-                _ -> pure v
+        Just v -> pure v
 
 evalCombination :: Env (Value a) -> Expr -> [Expr] -> Eval (Value a)
 evalCombination env name params = do

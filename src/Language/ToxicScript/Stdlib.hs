@@ -9,32 +9,71 @@ import Language.ToxicScript.Eval
 import Language.ToxicScript.Env
 import Language.ToxicScript.Expr
 
-consTr :: Expr -> Value a
-consTr cr = Transform $ \env params -> pure $ Promise env (List (cr:params))
+--  ($define! list-tail
+--      ($lambda (ls k)
+--          ($if (>? k 0)
+--              (list-tail (cdr ls) (- k 1))
+--              ls)))
+
+emptyTr :: Value a
+emptyTr = Promise emptyEnv (List [])
+
+lambdaTr :: Value a
+lambdaTr = Transform $ \staticEnv [name, body] -> do
+    pure $ Transform $ \dynEnv [value] -> do
+        val <- eval dynEnv value
+        eval (extendEnv name val staticEnv) body
+
+consTr :: Value a
+consTr = Transform $ \env [x, xs] -> do
+    rest <- eval env xs
+    case rest of
+        Promise _ (List listTail) -> callTransform listTr env [List (x:listTail)]
+        _ -> throwError $ "Not a valid const: " ++ show rest
+    -- rest <- eval env xs
+    -- logStr $ "Evaluating " ++ show xs ++ " to " ++ show rest
+    -- case rest of
+    --     Promise _ lstTail -> pure $ Promise env (List [x, lstTail])
+    --     v -> throwError $ "Not a valid const: " ++ show v
 
 listTr :: Value a
-listTr = Transform $ \env [lst] -> pure $ Promise env lst
+listTr = Transform $ \env elems ->
+    case elems of
+        [List xs] -> pure $ Promise env (List xs)
+        _ -> throwError $ "Invalid list: " ++ show elems
 
-nthTr :: (a -> Int) -> Expr -> Value a
-nthTr toNum cr = Transform $ \env [n, lstExpr] -> do
+nthTr :: (a -> Int) -> Value a
+nthTr toNum = Transform $ \env [n, lstExpr] -> do
     lst <- eval env lstExpr
     ni <- eval env n >>=
-            \case
-                Opaque v -> pure $ toNum v
-                _ -> throwError $ show cr ++ ": First argument does not evaluate " ++
-                        "to a number"
-    case lst of
-        Promise env' (List (_:listTail)) ->
-            case listTail of
-                [] -> throwError "Not enough elements in list"
-                (val:rest) ->
-                    if ni <= 0
-                        then eval env' val
-                        else
-                            let newExpr =
-                                    List (cr:mkSymbol (show (ni - 1)):rest)
-                            in  eval env' newExpr
-        _ -> throwError "Not a list"
+        \case
+            Opaque v -> pure $ toNum v
+            _ -> throwError "First argument does not evaluate to a number"
+    getNth ni lst
+
+getNth :: Int -> Value a -> Eval (Value a)
+getNth n (Promise env (List xs)) = eval env (xs !! n)
+getNth _ v = throwError $ "Not a list: " ++ show v
+
+-- -- Read all the parameters.
+-- -- If the number of parameters is less then it needs, return a new transform.
+-- -- If the number of parameters is equal to how many it needs, evaluate the
+-- -- underlying function.
+-- -- Otherwise, throw an error.
+
+-- -- Transform a = Env (Value a) -> [Expr] -> Expr -> Eval (Value a)
+-- curryTr :: Int -> ([Promise a] -> Eval (Value a)) -> Transform a
+-- curryTr argCount f = go [] argCount
+--     where
+--     -- go :: [Promise a] -> Int -> Env (Value a) -> [Expr] -> Expr -> Eval (Value a)
+--     go args 0 _ [] = const $ f args
+--     go _ 0 _ _ = \cr -> throwError $ show cr ++ ": too many arguments"
+--     go args argCountNeeded env params =
+--         if length params > argCountNeeded
+--             then go args 0 env params
+--             else const . pure . Transform $ \_ prms cr ->
+--                     go (args ++ zip (repeat env) params)
+--                         (argCountNeeded - length params) env prms cr
 
 mathTr :: Num n => (a -> n) -> (n -> a) -> (n -> n -> n) -> Value a
 mathTr toNum fromNum f = Transform $ \env [x, y] -> do
@@ -43,7 +82,8 @@ mathTr toNum fromNum f = Transform $ \env [x, y] -> do
     pure $ mathOp f v1 v2
     where
     -- mathOp :: (n -> n -> n) -> Value a -> Value a -> Value a
-    mathOp op (Opaque x) (Opaque y) = Opaque $ fromNum $ op (toNum x) (toNum y)
+    mathOp op (Opaque xv) (Opaque yv) =
+        Opaque $ fromNum $ op (toNum xv) (toNum yv)
     mathOp _ _ _ = error "mathOp: invalid argument"
 
 eqTr :: Eq a => (Bool -> a) -> Value a
@@ -70,16 +110,15 @@ ifTr toBool = Transform $ \env [cond, ifTrue, ifFalse] -> do
                 _ -> throwError $ "if: Cannot evaluate: " ++ show cond
     eval env (if cond' then ifTrue else ifFalse)
 
-lambdaTr :: Value a
-lambdaTr = Transform $ \env [name, body] -> do
-    pure $ Transform $ \dynEnv [value] -> do
-        val <- eval dynEnv value
-        let newEnv = extendEnv name val env
-        eval newEnv body
-
 letTr :: Value a
-letTr = Transform $ \env [name, value, body] ->
-    eval env (List [List [mkSymbol "lambda", name, body], value])
+letTr = Transform $ \env [name, value, body] -> do
+    tr <- callTransform lambdaTr env [name, body]
+    callTransform tr env [value]
+
+-- letrecTr :: Value a
+-- letrecTr = Transform $ \env [name, value, body] -> do
+--     let newEnv = extendEnv name (Promise newEnv value) env
+--     eval newEnv body
 
 letrecTr :: Value a
 letrecTr = Transform $ \env [name, value, body] -> mdo
