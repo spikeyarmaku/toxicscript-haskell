@@ -55,7 +55,7 @@ globalEnv =
         , mkTransform "+"       $ mathTr avToNum avFromNum (+)
         , mkTransform "*"       $ mathTr avToNum avFromNum (*)
         , mkTransform "-"       $ mathTr avToNum avFromNum (-)
-        -- , mkTransform "/"       $ mathTr avToNum avFromNum (/)
+        , mkTransform "/"       $ mathTr avToNum avFromNum (/)
         , mkTransform "="       $ eqTr avFromBool
 
         -- , mkConstant "pi"       $ VRat 3.141592653589
