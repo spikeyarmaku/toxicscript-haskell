@@ -39,3 +39,4 @@ import Language.ToxicScript.Env
 import Language.ToxicScript.Expr
 
 -- TODO write mkSyntax and mkFunction
+-- TODO write tests

@@ -11,11 +11,13 @@ import Language.ToxicScript.Eval
 import Language.ToxicScript.Env
 import Language.ToxicScript.Expr
 
+-- TODO consider using functions instead of bools
+-- (true -> `first`, false -> `second`)
 mkGlobalEnv
     :: (Num n, RealFrac n, Eq a)
     => (Rational -> a) -> (T.Text -> a) -- For parsing
     -> (a -> n) -> (n -> a)         -- to/from numerical types
-    -> (a -> Bool) -> (Bool -> a)   -- to/from bools (use functions instead?)
+    -> (a -> Bool) -> (Bool -> a)   -- to/from bools
     -> Env (Value a)
 mkGlobalEnv fromRat fromText toNum fromNum toBool fromBool =
     mkEnv (stringsAndNumbers (Opaque . fromRat) (Opaque . fromText))
@@ -24,7 +26,8 @@ mkGlobalEnv fromRat fromText toNum fromNum toBool fromBool =
         , addValue "letrec" letrecTr
         , addValue "list"   listTr
         , addValue "cons"   consTr
-
+        
+        , addValue "map"    mapTr
         , addValue "nth"    $ nthTr (round . toNum)
         , addValue "if"     $ ifTr toBool
         , addValue "+"      $ mathTr toNum fromNum (+)
@@ -38,6 +41,15 @@ mkGlobalEnv fromRat fromText toNum fromNum toBool fromBool =
         
         , (List [], emptyTr)
         ]
+
+mapTr :: Value a
+mapTr = curryTr 2 $ Transform $ \env [f, lstExpr] -> do
+    lst <- eval env lstExpr
+    case lst of
+        Promise env' (List xs) ->
+            let toMappedElem expr = List [f, expr]
+            in  pure $ Promise env' (List (map toMappedElem xs))
+        _ -> throwError "map: Not a list"
 
 emptyTr :: Value a
 emptyTr = Promise emptyEnv (List [])

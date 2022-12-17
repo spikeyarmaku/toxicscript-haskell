@@ -1,0 +1,2 @@
+    ; map test - should return 3
+(nth 2 (nth 3 (map (lambda n (list (1 2 3))) (list (0 1 2 3 4 5)))))
