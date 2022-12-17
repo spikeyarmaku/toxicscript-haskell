@@ -60,23 +60,21 @@ getNth _ v = throwError $ "Not a list: " ++ show v
 -- -- If the number of parameters is equal to how many it needs, evaluate the
 -- -- underlying function.
 -- -- Otherwise, throw an error.
-
--- -- Transform a = Env (Value a) -> [Expr] -> Expr -> Eval (Value a)
--- curryTr :: Int -> ([Promise a] -> Eval (Value a)) -> Transform a
--- curryTr argCount f = go [] argCount
---     where
---     -- go :: [Promise a] -> Int -> Env (Value a) -> [Expr] -> Expr -> Eval (Value a)
---     go args 0 _ [] = const $ f args
---     go _ 0 _ _ = \cr -> throwError $ show cr ++ ": too many arguments"
---     go args argCountNeeded env params =
---         if length params > argCountNeeded
---             then go args 0 env params
---             else const . pure . Transform $ \_ prms cr ->
---                     go (args ++ zip (repeat env) params)
---                         (argCountNeeded - length params) env prms cr
+curryTr :: Int -> Value a -> Value a
+curryTr = curryTr' []
+    where
+    -- curryTr' env args 0 tr = tr env args
+    curryTr' args argCount tr = Transform $ \env params -> do
+        let newArgs = args ++ params
+        logStr $ "newArgs: " ++ show newArgs ++ " argCount: " ++ show argCount
+        if length newArgs < argCount
+            then pure $ curryTr' (args ++ params) argCount tr
+            else if length newArgs == argCount
+                then callTransform tr env newArgs
+                else throwError "Too many arguments"
 
 mathTr :: Num n => (a -> n) -> (n -> a) -> (n -> n -> n) -> Value a
-mathTr toNum fromNum f = Transform $ \env [x, y] -> do
+mathTr toNum fromNum f = curryTr 2 $ Transform $ \env [x, y] -> do
     v1 <- eval env x
     v2 <- eval env y
     pure $ mathOp f v1 v2
@@ -85,6 +83,17 @@ mathTr toNum fromNum f = Transform $ \env [x, y] -> do
     mathOp op (Opaque xv) (Opaque yv) =
         Opaque $ fromNum $ op (toNum xv) (toNum yv)
     mathOp _ _ _ = error "mathOp: invalid argument"
+
+-- mathTr :: Num n => (a -> n) -> (n -> a) -> (n -> n -> n) -> Value a
+-- mathTr toNum fromNum f = Transform $ \env [x, y] -> do
+--     v1 <- eval env x
+--     v2 <- eval env y
+--     pure $ mathOp f v1 v2
+--     where
+--     -- mathOp :: (n -> n -> n) -> Value a -> Value a -> Value a
+--     mathOp op (Opaque xv) (Opaque yv) =
+--         Opaque $ fromNum $ op (toNum xv) (toNum yv)
+--     mathOp _ _ _ = error "mathOp: invalid argument"
 
 eqTr :: Eq a => (Bool -> a) -> Value a
 eqTr fromBool = Transform $ \env [a, b] -> do
@@ -125,3 +134,4 @@ letrecTr = Transform $ \env [name, value, body] -> mdo
     let newEnv = extendEnv name v env
     v <- eval newEnv value
     eval newEnv body
+
