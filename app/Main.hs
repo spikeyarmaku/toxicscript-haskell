@@ -43,47 +43,15 @@ withHandler eith =
         Right r -> pure r
 
 globalEnv :: Env (Value AppValue)
-globalEnv =
-    mkEnv (stringsAndNumbers ratToAppVal strToAppVal)
-        [ mkTransform "lambda"  lambdaTr
-        , mkTransform "let"     letTr
-        , mkTransform "letrec"  letrecTr
-        , mkTransform "list"    listTr
-        , mkTransform "cons"    consTr
-        , mkTransform "nth"     $ nthTr avToInt
-        , mkTransform "if"      $ ifTr avToBool
-        , mkTransform "+"       $ mathTr avToNum avFromNum (+)
-        , mkTransform "*"       $ mathTr avToNum avFromNum (*)
-        , mkTransform "-"       $ mathTr avToNum avFromNum (-)
-        , mkTransform "/"       $ mathTr avToNum avFromNum (/)
-        , mkTransform "="       $ eqTr avFromBool
-
-        -- , mkConstant "pi"       $ VRat 3.141592653589
-        , (List [], emptyTr)
-        ]
-
-strToAppVal :: T.Text -> Value AppValue
-strToAppVal = Opaque . VStr . T.unpack
-
-ratToAppVal :: Rational -> Value AppValue
-ratToAppVal = Opaque . VRat
+globalEnv = mkGlobalEnv VRat (VStr . T.unpack) avToNum VRat avToBool VBln
 
 avToBool :: AppValue -> Bool
 avToBool (VBln b) = b
 avToBool _ = error ""
 
-avFromBool :: Bool -> AppValue
-avFromBool = VBln
-
 avToNum :: AppValue -> Rational
 avToNum (VRat r) = r
 avToNum _ = error ""
-
-avToInt :: AppValue -> Int
-avToInt = round . avToNum
-
-avFromNum :: Rational -> AppValue
-avFromNum = VRat
 
 data AppValue
     = VRat Rational

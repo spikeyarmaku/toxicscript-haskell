@@ -24,7 +24,7 @@ import Language.ToxicScript.Eval
     , Eval
     , eval
     , callTransform
-    , mkTransform
+    , addValue
     )
 
 import Language.ToxicScript.Env

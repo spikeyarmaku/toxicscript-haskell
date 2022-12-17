@@ -23,8 +23,8 @@ callTransform :: Value a -> Env (Value a) -> [Expr] -> Eval (Value a)
 callTransform (Transform tr) env args = tr env args
 callTransform _ _ _ = throwError "Not a transform"
 
-mkTransform :: String -> Value a -> (Expr, Value a)
-mkTransform name tr = (mkSymbol name, tr)
+addValue :: String -> Value a -> (Expr, Value a)
+addValue name tr = (mkSymbol name, tr)
 
 instance Show (Value a) where
     show (Transform _) = "<<Transform>>"

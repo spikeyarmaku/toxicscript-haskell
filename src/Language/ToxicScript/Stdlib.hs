@@ -5,9 +5,39 @@ module Language.ToxicScript.Stdlib where
 
 import Control.Monad.Except ( throwError )
 
+import qualified Data.Text  as T
+
 import Language.ToxicScript.Eval
 import Language.ToxicScript.Env
 import Language.ToxicScript.Expr
+
+mkGlobalEnv
+    :: (Num n, RealFrac n, Eq a)
+    => (Rational -> a) -> (T.Text -> a) -- For parsing
+    -> (a -> n) -> (n -> a)         -- to/from numerical types
+    -> (a -> Bool) -> (Bool -> a)   -- to/from bools (use functions instead?)
+    -> Env (Value a)
+mkGlobalEnv fromRat fromText toNum fromNum toBool fromBool =
+    mkEnv (stringsAndNumbers (Opaque . fromRat) (Opaque . fromText))
+        [ addValue "lambda" lambdaTr
+        , addValue "let"    letTr
+        , addValue "letrec" letrecTr
+        , addValue "list"   listTr
+        , addValue "cons"   consTr
+
+        , addValue "nth"    $ nthTr (round . toNum)
+        , addValue "if"     $ ifTr toBool
+        , addValue "+"      $ mathTr toNum fromNum (+)
+        , addValue "*"      $ mathTr toNum fromNum (*)
+        , addValue "-"      $ mathTr toNum fromNum (-)
+        , addValue "/"      $ mathTr toNum fromNum (/)
+        , addValue "="      $ eqTr fromBool
+
+        , addValue "pi"     $ Opaque $ fromNum 3.141592653589
+        , addValue "e"      $ Opaque $ fromNum 2.718281828459
+        
+        , (List [], emptyTr)
+        ]
 
 emptyTr :: Value a
 emptyTr = Promise emptyEnv (List [])
