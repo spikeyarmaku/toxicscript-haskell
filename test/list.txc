@@ -1,5 +1,11 @@
     ; Test for different lists - should return 12
-(let e1 (nth 3 (cons 0 (list (1 2 3 4 5))))
-    (let e2 (nth 4 (list (0 1 2 3 4 5)))
-        (let e3 (nth 5 (cons 0 (cons 1 (cons 2 (cons 3 (cons 4 (cons 5 ())))))))
-            (+ e1 (+ e2 e3)))))
+(let
+    (
+        (e1 (nth 3 (cons 0 (list (1 2 3 4 5)))))
+        (e2 (nth 4 (list (0 1 2 3 4 5))))
+        (e3 (nth 2 (cons 0 (cons 1 (cons 2 (cons 3 (list ())))))))
+        (lst1 (list (1 2 3 4)))
+        (e4 (nth 3 (cons 2 lst1)))
+    )
+    (+ e1 (+ e2 (+ e3 e4)))
+)

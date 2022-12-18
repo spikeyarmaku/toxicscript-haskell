@@ -4,6 +4,7 @@
 module Language.ToxicScript.Stdlib where
 
 import Control.Monad.Except ( throwError )
+import Control.Monad.State  ( get )
 
 import qualified Data.Text  as T
 
@@ -20,31 +21,33 @@ mkGlobalEnv
     -> (a -> Bool) -> (Bool -> a)   -- to/from bools
     -> Env (Value a)
 mkGlobalEnv fromRat fromText toNum fromNum toBool fromBool =
-    mkEnv (stringsAndNumbers (Opaque . fromRat) (Opaque . fromText))
-        [ addValue "lambda" lambdaTr
-        , addValue "let"    letTr
-        , addValue "letrec" letrecTr
-        , addValue "list"   listTr
-        , addValue "cons"   consTr
+    extendEnvMany (stringsAndNumbers (Opaque . fromRat) (Opaque . fromText))
+        [ addValue "lambda"     lambdaTr
+        -- , addValue "let1"       let1Tr
+        -- , addValue "letrec1"    letrec1Tr
+        , addValue "let"        letTr
+        , addValue "letrec"     letrecTr
+        , addValue "list"       listTr
+        , addValue "cons"       consTr
         
-        , addValue "map"    mapTr
-        , addValue "nth"    $ nthTr (round . toNum)
-        , addValue "if"     $ ifTr toBool
-        , addValue "+"      $ mathTr toNum fromNum (+)
-        , addValue "*"      $ mathTr toNum fromNum (*)
-        , addValue "-"      $ mathTr toNum fromNum (-)
-        , addValue "/"      $ mathTr toNum fromNum (/)
-        , addValue "="      $ eqTr fromBool
+        , addValue "map"        mapTr
+        , addValue "nth"        $ nthTr (round . toNum)
+        , addValue "if"         $ ifTr toBool
+        , addValue "+"          $ mathTr toNum fromNum (+)
+        , addValue "*"          $ mathTr toNum fromNum (*)
+        , addValue "-"          $ mathTr toNum fromNum (-)
+        , addValue "/"          $ mathTr toNum fromNum (/)
+        , addValue "="          $ eqTr fromBool
 
-        , addValue "pi"     $ Opaque $ fromNum 3.141592653589
-        , addValue "e"      $ Opaque $ fromNum 2.718281828459
+        , addValue "pi"         $ Opaque $ fromNum 3.141592653589
+        , addValue "e"          $ Opaque $ fromNum 2.718281828459
         
         , (List [], emptyTr)
         ]
 
 mapTr :: Value a
-mapTr = curryTr 2 $ Transform $ \env [f, lstExpr] -> do
-    lst <- eval env lstExpr
+mapTr = curryTr 2 $ Transform $ \[f, lstExpr] -> do
+    lst <- eval lstExpr
     case lst of
         Promise env' (List xs) ->
             let toMappedElem expr = List [f, expr]
@@ -55,35 +58,38 @@ emptyTr :: Value a
 emptyTr = Promise emptyEnv (List [])
 
 lambdaTr :: Value a
-lambdaTr = Transform $ \staticEnv [name, body] -> do
-    pure $ Transform $ \dynEnv [value] -> do
-        val <- eval dynEnv value
-        eval (extendEnv name val staticEnv) body
+lambdaTr = Transform $ \[name, body] -> do
+    staticEnv <- get
+    pure $ Transform $ \[value] -> do
+        val <- eval value
+        withEnv (extendEnv name val staticEnv) $ eval body
 
 consTr :: Value a
-consTr = Transform $ \env [x, xs] -> do
-    rest <- eval env xs
+consTr = Transform $ \[x, xs] -> do
+    rest <- eval xs
     case rest of
-        Promise _ (List listTail) -> callTransform listTr env [List (x:listTail)]
+        Promise _ (List listTail) -> callTransform listTr [List (x:listTail)]
         _ -> throwError $ "Not a valid const: " ++ show rest
 
 listTr :: Value a
-listTr = Transform $ \env elems ->
+listTr = Transform $ \elems -> do
+    env <- get
     case elems of
         [List xs] -> pure $ Promise env (List xs)
         _ -> throwError $ "Invalid list: " ++ show elems
 
 nthTr :: (a -> Int) -> Value a
-nthTr toNum = Transform $ \env [n, lstExpr] -> do
-    lst <- eval env lstExpr
-    ni <- eval env n >>=
+nthTr toNum = Transform $ \[n, lstExpr] -> do
+    lst <- eval lstExpr
+    ni <- eval n >>=
         \case
             Opaque v -> pure $ toNum v
             _ -> throwError "First argument does not evaluate to a number"
     getNth ni lst
 
-getNth :: Int -> Value a -> Eval (Value a)
-getNth n (Promise env (List xs)) = eval env (xs !! n)
+getNth :: Int -> Value a -> Toxic a
+getNth n (Promise env (List xs)) = do
+    withEnv env $ eval (xs !! n)
 getNth _ v = throwError $ "Not a list: " ++ show v
 
 -- -- Read all the parameters.
@@ -94,18 +100,18 @@ getNth _ v = throwError $ "Not a list: " ++ show v
 curryTr :: Int -> Value a -> Value a
 curryTr = curryTr' []
     where
-    curryTr' args argCount tr = Transform $ \env params -> do
+    curryTr' args argCount tr = Transform $ \params -> do
         let newArgs = args ++ params
-        logStr $ "newArgs: " ++ show newArgs ++ " argCount: " ++ show argCount
+        -- logStr $ "newArgs: " ++ show newArgs ++ " argCount: " ++ show argCount
         if length newArgs < argCount
             then pure $ curryTr' (args ++ params) argCount tr
             else if length newArgs == argCount
-                then callTransform tr env newArgs
+                then callTransform tr newArgs
                 else throwError "Too many arguments"
 
 toCurriedFunc :: Int -> ([a] -> a) -> Value a
-toCurriedFunc n f = curryTr n $ Transform $ \env params -> do
-    args <- mapM (eval env) params
+toCurriedFunc n f = curryTr n $ Transform $ \params -> do
+    args <- mapM eval params
     let isOpaque (Opaque _) = True
         isOpaque _ = False
         fromOpaque (Opaque o) = o
@@ -122,22 +128,51 @@ eqTr :: Eq a => (Bool -> a) -> Value a
 eqTr fromBool = toCurriedFunc 2 $ \[a, b] -> fromBool (a == b)
 
 ifTr :: (a -> Bool) -> Value a
-ifTr toBool = Transform $ \env [cond, ifTrue, ifFalse] -> do
+ifTr toBool = Transform $ \[cond, ifTrue, ifFalse] -> do
     cond' <-
-        eval env cond >>= 
+        eval cond >>= 
             \case
                 Opaque x -> pure $ toBool x
                 _ -> throwError $ "if: Cannot evaluate: " ++ show cond
-    eval env (if cond' then ifTrue else ifFalse)
+    eval (if cond' then ifTrue else ifFalse)
 
 letTr :: Value a
-letTr = Transform $ \env [name, value, body] -> do
-    tr <- callTransform lambdaTr env [name, body]
-    callTransform tr env [value]
+letTr = Transform $ \[bindingList, body] -> do
+    env <- get
+    case bindingList of
+        List bindings ->
+            case bindings of
+                [] -> eval body
+                (List [name, value]:rest) -> do
+                    v <- eval value
+                    withEnv (extendEnv name v env) $
+                        callTransform letTr [List rest, body]
+                _ -> throwError "let: Invalid binding in binding list"
+        _ -> throwError "let: Invalid binding list"
 
 letrecTr :: Value a
-letrecTr = Transform $ \env [name, value, body] -> mdo
-    let newEnv = extendEnv name v env
-    v <- eval newEnv value
-    eval newEnv body
+letrecTr = Transform $ \[bindingList, body] -> do
+    case bindingList of
+        List bindings ->
+            case bindings of
+                [] -> eval body
+                (List [name, value]:rest) -> mdo
+                    env <- get
+                    -- let newEnv = extendEnv name (Promise newEnv value) env
+                    let newEnv = extendEnv name v env
+                    v <- withEnv newEnv $ eval value
+                    withEnv newEnv $ callTransform letrecTr [List rest, body]
+                _ -> throwError "let: Invalid binding in binding list"
+        _ -> throwError "let: Invalid binding list"
+
+-- let1Tr :: Value a
+-- let1Tr = Transform $ \[name, value, body] -> do
+--     tr <- callTransform lambdaTr [name, body]
+--     callTransform tr [value]
+
+-- letrec1Tr :: Value a
+-- letrec1Tr = Transform $ \[name, value, body] -> mdo
+--     modify (extendEnv name v)
+--     v <- eval value
+--     eval body
 

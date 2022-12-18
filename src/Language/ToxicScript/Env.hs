@@ -31,5 +31,5 @@ extendEnv :: Expr -> a -> Env a -> Env a
 extendEnv expr val oldEnv =
     Env $ \e -> if e == expr then Just val else lookupEnv oldEnv e
 
-mkEnv :: Env a -> [(Expr, a)] -> Env a
-mkEnv = foldr (\(name, val) env -> extendEnv name val env)
+extendEnvMany :: Env a -> [(Expr, a)] -> Env a
+extendEnvMany = foldr (\(name, val) env -> extendEnv name val env)

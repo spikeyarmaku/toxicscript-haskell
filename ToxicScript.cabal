@@ -13,7 +13,7 @@ category:           Language, Scripting
 extra-source-files: CHANGELOG.md
 
 library
-    exposed-modules:    Language.ToxicScript,
+    exposed-modules:    Language.ToxicScript
                         Language.ToxicScript.Stdlib
     hs-source-dirs:     src
     other-modules:      Language.ToxicScript.Parse,
@@ -37,4 +37,5 @@ executable ToxicScript-test
     build-depends:      base ^>=4.14.3.0,
                         ToxicScript,
                         text,
-                        mtl
+                        mtl,
+                        directory

@@ -20,19 +20,21 @@ import Language.ToxicScript.Parse
     )
 
 import Language.ToxicScript.Eval
-    ( Value (..)
-    , Eval
-    , eval
-    , callTransform
-    , addValue
-    )
+    -- ( Value (..)
+    -- , Result (..)
+    -- , Eval
+    -- , eval
+    -- , callTransform
+    -- , addValue
+    -- , runEval
+    -- )
 
 import Language.ToxicScript.Env
     ( Env
     , emptyEnv
     , stringsAndNumbers
     , extendEnv
-    , mkEnv
+    , extendEnvMany
     , lookupEnv
     )
 

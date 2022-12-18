@@ -2,26 +2,28 @@ module Language.ToxicScript.Eval where
 
 import Control.Monad.Writer
 import Control.Monad.Except
+import Control.Monad.State
 
 import Language.ToxicScript.Expr
 import Language.ToxicScript.Combination
 import Language.ToxicScript.Env
 
---
+--              log             env             error
+type Eval a b = ExceptT String (StateT (Env a) (Writer String)) b
 
-type Eval = ExceptT String (Writer String)
+type Toxic a = Eval (Value a) (Value a)
 
-logStr :: String -> Eval ()
-logStr str = tell ("[INFO] " ++ str ++ "\n")
+logStr :: String -> Eval a ()
+logStr str = tell $ "[INFO] " ++ str ++ "\n"
 
 data Value a
-    = Transform (Env (Value a) -> [Expr] -> Eval (Value a))
+    = Transform ([Expr] -> Toxic a)
     | Promise (Env (Value a)) Expr
     | Opaque a
 
-callTransform :: Value a -> Env (Value a) -> [Expr] -> Eval (Value a)
-callTransform (Transform tr) env args = tr env args
-callTransform _ _ _ = throwError "Not a transform"
+callTransform :: Value a -> [Expr] -> Toxic a
+callTransform (Transform tr) args = tr args
+callTransform _ _ = throwError "Not a transform"
 
 addValue :: String -> Value a -> (Expr, Value a)
 addValue name tr = (mkSymbol name, tr)
@@ -31,10 +33,22 @@ instance Show (Value a) where
     show (Promise _ e) = "<<Promise: " ++ show e ++ ">>"
     show (Opaque _) = "<<Opaque value>>"
 
-eval :: Env (Value a) -> Expr -> Eval (Value a)
-eval env expr = do
+data Result a
+    = Result
+        { getResult :: Either String a
+        , getLog    :: String }
+
+runEval :: Env (Value a) -> Expr -> Result (Value a)
+runEval env expr =
+    let ((result, _), logMsg) =
+            runWriter (runStateT (runExceptT (eval expr)) env)
+    in  Result result logMsg
+
+eval :: Expr -> Toxic a
+eval expr = do
     -- Check if the expression has a value assigned to it
     logStr $ "Evaluating: `" ++ show expr ++ "`"
+    env <- get
     case lookupEnv env expr of
         Nothing -> do
             -- If not, check if it is a valid combination
@@ -43,17 +57,30 @@ eval env expr = do
                 then do
                     case getCombination expr of
                         Left e -> throwError e
-                        Right (combiner, params) ->
-                            evalCombination env combiner params
+                        Right (combiner, params) -> do
+                            val <- eval combiner
+                            evalCombination val params
                 else throwError $ "No value assigned to " ++ show expr
         Just v -> pure v
+            -- case v of
+            --     Promise env' expr' -> withEnv env' $ eval expr'
+            --     _ -> pure v
 
-evalCombination :: Env (Value a) -> Expr -> [Expr] -> Eval (Value a)
-evalCombination env name params = do
-    val <- eval env name
+withEnv :: Env a -> Eval a b -> Eval a b
+withEnv env comp = do
+    s <- get
+    put env
+    v <- comp
+    put s
+    pure v
+
+evalCombination :: Value a -> [Expr] -> Toxic a
+evalCombination val params = do
     case val of
-        Transform t -> t env params
-        Promise env' e -> evalCombination env' e params
+        Transform t -> t params
+        Promise env' e -> do
+            p <- withEnv env' $ eval e
+            evalCombination p params
         Opaque o ->
             if null params
                 then pure $ Opaque o
