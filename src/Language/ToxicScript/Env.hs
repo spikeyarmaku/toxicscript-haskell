@@ -16,6 +16,9 @@ data Env a
         { convertExpr   :: Expr -> Maybe a
         , lookupExpr    :: M.Map Expr a }
 
+instance Show (Env a) where
+    show (Env _ es) = show $ M.keys es
+
 emptyEnv :: Env a
 emptyEnv = Env (const Nothing) M.empty
 

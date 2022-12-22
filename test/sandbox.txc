@@ -1,4 +1,26 @@
-(let x 1 (let f (lambda y x) (let x 2 (f 0))))
+; (lets
+;     (
+;         (x 1)
+;         (y x)
+;     )
+
+;     y
+; )
+
+(lets
+    (
+        (true   (lambda x (lambda y x)))
+        (false  (lambda x (lambda y y)))
+        (pair   (lambda x (lambda y (lambda f (f x y)))))
+        (fst    (lambda p (p true)))
+        (snd    (lambda p (p false)))
+        (if
+            (lambda cond
+                (lambda ifTrue (lambda ifFalse (cond ifTrue ifFalse)))))
+    )
+
+    (fst (pair 9 5))
+)
 
 ; (let x 1 (let f (lambda y x) (let x 2 (f 0))))
 ; (lambda x x 1)

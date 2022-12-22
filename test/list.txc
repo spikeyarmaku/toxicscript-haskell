@@ -1,5 +1,5 @@
     ; Test for different lists - should return 12
-(let
+(lets
     (
         (e1 (nth 3 (cons 0 (list (1 2 3 4 5)))))
         (e2 (nth 4 (list (0 1 2 3 4 5))))
