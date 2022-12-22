@@ -1,1 +1,14 @@
-(let ((2 2.5)) (+ 2 2))
+(let x 1 (let f (lambda y x) (let x 2 (f 0))))
+
+; (let x 1 (let f (lambda y x) (let x 2 (f 0))))
+; (lambda x x 1)
+; (let x 1 x)
+
+; (snd (pair 9 5))
+
+; let x n b == lambda x b n
+; (lambda x (lambda f (lambda x (f 0) 2) (lambda y x)) 1)
+
+; (let x 1 (let f (lambda y x) (let x 2 (f 0))))
+
+; (x y)

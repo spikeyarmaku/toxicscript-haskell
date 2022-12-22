@@ -1,7 +1,9 @@
 module Language.ToxicScript.Expr
     ( Expr (..)
+    , Symbol (..)
     , emptyExpr
     , serializeExpr
+    , showExpr
     , drawExpr
     , mkSymbol
     , mkList
@@ -13,15 +15,20 @@ import qualified Data.Text as T
 --
 
 data Expr -- a tagless version of Data.SExpresso.SExp
-    = Symbol T.Text
+    = Atom Symbol
     | List [Expr]
     deriving (Eq, Ord)
+
+newtype Symbol = Symbol T.Text deriving (Eq, Ord)
 
 instance Show Expr where
     show = serializeExpr
 
+instance Show Symbol where
+    show (Symbol s) = T.unpack s
+
 mkSymbol :: String -> Expr
-mkSymbol = Symbol . T.pack
+mkSymbol = Atom . Symbol . T.pack
 
 mkList :: [Expr] -> Expr
 mkList = List
@@ -30,16 +37,20 @@ emptyExpr :: Expr
 emptyExpr = List []
 
 serializeExpr :: Expr -> String
-serializeExpr (Symbol a) = T.unpack a
+serializeExpr (Atom a) = show a
 serializeExpr (List xs) = "(" ++ unwords (map serializeExpr xs) ++ ")"
+
+showExpr :: Expr -> String
+showExpr (Atom a) = "Atom " ++ show a
+showExpr (List xs) = "List [" ++ intercalate ", " (map showExpr xs) ++ "]"
 
 drawExpr :: Expr -> String
 drawExpr expr = intercalate "\n" $ drawExpr' (getHeight expr) expr
 
 drawExpr' :: Int -> Expr -> [String]
-drawExpr' height (Symbol a) =
+drawExpr' height (Atom a) =
     show a :
-        concat (replicate (height - 1) [replicate (getWidth (Symbol a)) ' '])
+        concat (replicate (height - 1) [replicate (getWidth (Atom a)) ' '])
 drawExpr' height (List []) =
     "█" : concat (replicate (height - 1)
             [replicate (getWidth (List [] :: Expr)) ' '])
@@ -62,7 +73,7 @@ drawExpr' height l@(List (x:xs)) =
                 (drawExpr' (height - 1) (List xs))
 
 getWidth :: Expr -> Int
-getWidth (Symbol a) = length . show $ a
+getWidth (Atom a) = length . show $ a
 getWidth (List (x:xs)) = max 3 $ getWidth x + getWidth (List xs) + 1
 getWidth (List []) = length . drawExpr $ (List [] :: Expr)
 

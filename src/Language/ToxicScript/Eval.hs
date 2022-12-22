@@ -1,87 +1,79 @@
 module Language.ToxicScript.Eval where
 
-import Control.Monad.Writer
-import Control.Monad.Except
-import Control.Monad.State
-
 import Language.ToxicScript.Expr
 import Language.ToxicScript.Combination
 import Language.ToxicScript.Env
 
---              log             env             error
-type Eval a b = ExceptT String (StateT (Env a) (Writer String)) b
+import Debug.Trace
 
-type Toxic a = Eval (Value a) (Value a)
+data Term a
+    = Val a                                 -- User-defined value
+    | Var Symbol                            -- Variable
+    | Abs (Env (Term a) -> Expr -> Term a)
+    -- | Cls (Env (Term a)) Expr (Term a)      -- Closure
+    -- | Syn (Env (Term a) -> Expr -> Term a)  -- Syntax definition
+    -- | App (Term a) (Term a)                 -- Application
+    -- | Exp Expr                              -- Unevaluated expression
 
-logStr :: String -> Eval a ()
-logStr str = tell $ "[INFO] " ++ str ++ "\n"
+showTerm :: Show a => Term a -> String
+showTerm (Val a)        = "<<Value: " ++ show a ++ ">>"
+showTerm (Var v)        = "<<Variable: " ++ show v ++ ">>"
+-- showTerm (Exp e)        = "<<Expression: " ++ show e ++ ">>"
+showTerm (Abs _)      = "<<Abstraction>>"
+-- showTerm (Cls _ e t)    = "<<Closure: (" ++ show e ++ ") " ++ show t ++ ">>"
+-- showTerm (Cls _)    = "<<Closure>>"
+-- showTerm (App e1 e2)    = "<<Application: (" ++ show e1 ++ ") (" ++ show e2 ++ ")>>"
+-- showTerm (Syn _)        = "<<Syntax definition>>"
 
-data Value a
-    = Transform ([Expr] -> Toxic a)
-    | Promise (Env (Value a)) Expr
-    | Opaque a
+instance Show (Term a) where
+    show = defaultPrint
 
-callTransform :: Value a -> [Expr] -> Toxic a
-callTransform (Transform tr) args = tr args
-callTransform _ _ = throwError "Not a transform"
-
-addValue :: String -> Value a -> (Expr, Value a)
-addValue name tr = (mkSymbol name, tr)
-
-instance Show (Value a) where
-    show (Transform _) = "<<Transform>>"
-    show (Promise _ e) = "<<Promise: " ++ show e ++ ">>"
-    show (Opaque _) = "<<Opaque value>>"
+defaultPrint :: Term a -> [Char]
+defaultPrint (Val _) = "Val _"
+defaultPrint (Var v) = "Var " ++ show v
+-- defaultPrint (Exp e) = "Exp " ++ show e
+defaultPrint (Abs _) = "Abs"
+-- defaultPrint (App e1 e2) =
+    -- "App (" ++ defaultPrint e1 ++ ") (" ++ defaultPrint e2 ++ ")"
+-- defaultPrint (Abs _) = "Abs <<Term a -> Term a>>"
+-- defaultPrint (Cls _ n b) = "Cls " ++ show n ++ " (" ++ defaultPrint b ++ ")"
+-- defaultPrint (Cls _) = "Cls <<Env (Term a) -> Expr -> Term a>>"
+-- defaultPrint (Syn _) = "Syn <<Env (Term a) -> Expr -> Term a>>"
 
 data Result a
     = Result
         { getResult :: Either String a
         , getLog    :: String }
+    deriving (Show)
 
-runEval :: Env (Value a) -> Expr -> Result (Value a)
-runEval env expr =
-    let ((result, _), logMsg) =
-            runWriter (runStateT (runExceptT (eval expr)) env)
-    in  Result result logMsg
+eval :: Env (Term a) -> Term a -> Term a
+eval _      (Val a)         = Val a
+eval env    (Var v)         =
+    case lookupEnv env (Atom v) of
+        Nothing -> Var v
+        Just x -> x
+eval _      (Abs f)       = Abs f
+-- eval _      (Syn f)         = Syn f
+-- eval env    (Exp x)         = evalExp env x
+-- eval env    (App t1 t2)     = apply env t1 t2
 
-eval :: Expr -> Toxic a
-eval expr = do
-    -- Check if the expression has a value assigned to it
-    logStr $ "Evaluating: `" ++ show expr ++ "`"
-    env <- get
-    case lookupEnv env expr of
-        Nothing -> do
-            -- If not, check if it is a valid combination
-            if isValidCombination expr
-                -- If it is, evaluate the combiner, and apply the parameters
-                then do
-                    case getCombination expr of
-                        Left e -> throwError e
-                        Right (combiner, params) -> do
-                            val <- eval combiner
-                            evalCombination val params
-                else throwError $ "No value assigned to " ++ show expr
-        Just v -> pure v
-            -- case v of
-            --     Promise env' expr' -> withEnv env' $ eval expr'
-            --     _ -> pure v
+apply :: Env (Term a) -> Term a -> Expr -> Term a
+-- apply env (Syn f) (Exp e) = f env e
+apply env (Abs f) v = f env v
+apply env t1 t2 = apply env (eval env t1) t2
 
-withEnv :: Env a -> Eval a b -> Eval a b
-withEnv env comp = do
-    s <- get
-    put env
-    v <- comp
-    put s
-    pure v
-
-evalCombination :: Value a -> [Expr] -> Toxic a
-evalCombination val params = do
-    case val of
-        Transform t -> t params
-        Promise env' e -> do
-            p <- withEnv env' $ eval e
-            evalCombination p params
-        Opaque o ->
-            if null params
-                then pure $ Opaque o
-                else throwError $ "Too many parameters: " ++ show params
+evalExpr :: Env (Term a) -> Expr -> Term a
+evalExpr env x = -- trace ("evalExp " ++ show x) $
+    case lookupEnv env x of
+        Nothing -> -- trace "  No value assigned" $
+            case getCombination x of
+                Left _ -> -- trace "  Not a combination" $
+                    case getSymbol x of
+                        Left e -> error $ "PANIC! " ++ e
+                        Right s -> error $ "Unassigned variable: " ++ show s
+                Right (List [], p) -> -- trace "  Singular combination" $
+                    evalExpr env p
+                Right (c, p) -> -- trace "  Combination" $
+                    apply env (evalExpr env c) p
+        Just v -> -- trace "  Value assigned"
+            v

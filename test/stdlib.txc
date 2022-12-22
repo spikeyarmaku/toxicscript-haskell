@@ -1,0 +1,10 @@
+(defs
+    (
+        (true   (lambda x (lambda y x)))
+        (false  (lambda x (lambda y y)))
+        (pair   (lambda x (lambda y (lambda f (f x y)))))
+        (fst    (lambda p (p true)))
+        (snd    (lambda p (p false)))
+        (if     (lambda cond (lambda ifTrue (lambda ifFalse (cond ifTrue ifFalse)))))
+    )
+)

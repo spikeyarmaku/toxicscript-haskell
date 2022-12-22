@@ -98,7 +98,7 @@ rationalLit = do
 -- sexprToBinExpr `(() ())` = Cons Nil (SCons SNil SNil)
 sexprToExpr :: S.Sexp T.Text -> Expr
 sexprToExpr (S.SList _ es) = List (map sexprToExpr es)
-sexprToExpr (S.SAtom a) = Symbol a
+sexprToExpr (S.SAtom a) = Atom $ Symbol a
 
 testPrint :: String -> String
 testPrint inp =
