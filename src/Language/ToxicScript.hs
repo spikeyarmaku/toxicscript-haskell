@@ -50,6 +50,7 @@ module Language.ToxicScript
     , module Language.ToxicScript.Env
     ) where
 
+-- TODO write export lists
 import Language.ToxicScript.Combination
 --     ( getCombiner
 --     , getParams
@@ -85,5 +86,4 @@ import Language.ToxicScript.Env
 
 import Language.ToxicScript.Expr
 
--- TODO write mkSyntax and mkFunction
 -- TODO write tests

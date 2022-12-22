@@ -17,7 +17,6 @@ import Language.ToxicScript.Stdlib
 main :: IO ()
 main = do
     evalFile "test/sandbox.txc"
-    -- evalFile "test/stdlib.txc"
     -- files <- listDirectory "test"
     -- mapM_ (withCurrentDirectory "test" . evalFile) files
 
