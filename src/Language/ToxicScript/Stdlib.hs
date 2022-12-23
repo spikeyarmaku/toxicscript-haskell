@@ -49,9 +49,8 @@ lambdaV = Abs $ \_ name -> Abs $ \staticEnv body -> Abs $ \dynEnv value ->
     lamF staticEnv dynEnv name body value
 
 lamF :: Env (Term a) -> Env (Term a) -> Expr -> Expr -> Expr -> Term a
-lamF staticEnv dynEnv (Atom name) body value =
-    evalExpr (extendEnv (Atom name) (evalExpr dynEnv value) staticEnv) body
-lamF env _ x _ _ = evalExpr env x
+lamF staticEnv dynEnv name body value =
+    evalExpr (extendEnv name (evalExpr dynEnv value) staticEnv) body
 
 letF :: Env (Term a) -> Env (Term a) -> Expr -> Expr -> Expr -> Term a
 letF staticEnv dynEnv name value body = lamF staticEnv dynEnv name body value
