@@ -6,7 +6,7 @@ import Language.ToxicScript.Env
 
 data Term a
     = Val a                                 -- User-defined value
-    | Var Symbol                            -- Variable
+    | Var Expr                              -- Variable
     | Abs (Env (Term a) -> Expr -> Term a)  -- Lambda abstraction
     -- Application is handled explicitly by the syntax (see `evalExpr` and
     -- `apply`)
@@ -33,7 +33,7 @@ data Result a
 eval :: Env (Term a) -> Term a -> Term a
 eval _ (Val a) = Val a
 eval env (Var v) =
-    case lookupEnv env (Atom v) of
+    case lookupEnv env v of
         Nothing -> Var v
         Just x -> x
 eval _ (Abs f) = Abs f
