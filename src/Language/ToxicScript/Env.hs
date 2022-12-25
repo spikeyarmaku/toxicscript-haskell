@@ -10,7 +10,6 @@ import qualified Data.Map   as M
 import Language.ToxicScript.Expr
 import Language.ToxicScript.Parse
 
-
 data Env a
     = Env
         { convertExpr   :: Expr -> Maybe a
