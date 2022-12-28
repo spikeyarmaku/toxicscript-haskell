@@ -25,6 +25,7 @@ evalFile fp = do
     expr <- readFile fp
     putStrLn $ "\n--- EVALUATING " ++ show fp ++ " ---\n"
     ast <- withHandler $ parseExpr (T.pack expr)
+    putStrLn $ showExpr ast
     case evalExpr globalEnv ast of
         Val x -> print x
         Var x -> putStrLn $ "Variable " ++ show x

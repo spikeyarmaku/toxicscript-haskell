@@ -47,12 +47,9 @@ evalExpr env x =
     case lookupEnv env x of
         Nothing ->
             case getCombination x of
-                Left _ ->
-                    case getSymbol x of
-                        Left e -> error $ "PANIC! " ++ e
-                        Right s -> error $ "Unassigned variable: " ++ show s
-                Right (List [], p) ->
-                    evalExpr env p
-                Right (c, p) ->
-                    apply env (evalExpr env c) p
+                Atomic sym -> error $ "Unassigned variable: " ++ show sym
+                Combination c p ->
+                    case c of
+                        List [] -> evalExpr env p
+                        _       -> apply env (evalExpr env c) p
         Just v -> v

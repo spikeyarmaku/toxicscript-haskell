@@ -1,28 +1,25 @@
-; (lets
-;     (
-;         (x 1)
-;         (y x)
-;     )
+(letrec fact
+    (lambda n ((= n 1) 1 (* n (fact (- n 1)))))
+    (fact 5))
 
-;     y
+; (let Z
+;     (lambda f
+;         (
+;             (lambda x (f (lambda v (x x v))))
+;             (lambda x (f (lambda v (x x v))))
+;         )
+;     )
+;     (
+;         let fact (Y (lambda fact (lambda n (
+;             (= n 1) 1 (* n (fact (- n 1)))
+;         )))) (fact 5)
+;     )
 ; )
 
-(lets
-    (
-        ((* 2 2) 5)
-    )
-    (* 2 2)
-)
-
-; (let x 1 (let f (lambda y x) (let x 2 (f 0))))
-; (lambda x x 1)
-; (let x 1 x)
-
-; (snd (pair 9 5))
-
-; let x n b == lambda x b n
-; (lambda x (lambda f (lambda x (f 0) 2) (lambda y x)) 1)
-
-; (let x 1 (let f (lambda y x) (let x 2 (f 0))))
-
-; (x y)
+; Z combinator
+; (lambda f
+;     (
+;         (lambda x (f (lambda v (x x v))))
+;         (lambda x (f (lambda v (x x v))))
+;     )
+; )

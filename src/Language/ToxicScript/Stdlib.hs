@@ -1,6 +1,11 @@
+-- for letrec:
+-- https://lptk.github.io/programming/2019/10/15/simple-essence-y-combinator.html
+
 module Language.ToxicScript.Stdlib where
 
 import qualified Data.Text  as T
+
+import Data.Either  ( fromRight )
 
 import Language.ToxicScript.Eval
 import Language.ToxicScript.Env
@@ -16,15 +21,15 @@ fromCode env name t =
 mkGlobalEnv
     :: (Num n, RealFrac n, Eq a)
     => (Rational -> a) -> (T.Text -> a) -- For parsing
-    -> (a -> n) -> (n -> a)         -- to/from numerical types
+    -> (a -> n) -> (n -> a)             -- to/from numerical types
     -> Env (Term a)
 mkGlobalEnv fromRat fromText toNum fromNum =
     extendEnvMany (stringsAndNumbers (Val . fromRat) (Val . fromText))
         [ (mkSymbol "lambda",   lambdaV)
         , (mkSymbol "let",      letV)
-        , (mkSymbol "lets",     letsV)
         , (mkSymbol "letrec",   letrecV)
-        , (mkSymbol "letrecs",  letrecsV)
+        , (mkSymbol "true",     trueV)
+        , (mkSymbol "false",    falseV)
 
         -- , addValue "list"       listTr
         -- , addValue "cons"       consTr
@@ -38,11 +43,12 @@ mkGlobalEnv fromRat fromText toNum fromNum =
         , (mkSymbol "/",    mathVal toNum fromNum (/))
         , (mkSymbol "=",    eqVal)
 
-        -- , addValue "pi"         $ Opaque $ fromNum 3.141592653589
-        -- , addValue "e"          $ Opaque $ fromNum 2.718281828459
-        
-        -- , (List [], emptyTr)
+        , (mkSymbol "pi",   Val $ fromNum 3.141592653589)
+        , (mkSymbol "e",    Val $ fromNum 2.718281828459)
         ]
+
+vauV :: Term a
+vauV = undefined
 
 lambdaV :: Term a
 lambdaV = Abs $ \_ name -> Abs $ \staticEnv body -> Abs $ \dynEnv value ->
@@ -61,39 +67,55 @@ letV =
         Abs $ \staticEnv value ->
             Abs $ \dynEnv body -> letF staticEnv dynEnv name value body
 
+-- true = (lambda x (lambda y x))
+trueV :: Term a
+trueV = Abs $ \_ x -> Abs $ \env _ -> evalExpr env x
+
+falseV :: Term a
+falseV = Abs $ \_ _ -> Abs $ \env y -> evalExpr env y
+
+-- letrec name value body = let name (Z (lambda name value)) body
 letrecV :: Term a
 letrecV =
     Abs $ \_ name ->
-        Abs $ \_ value ->
-            Abs $ \dynEnv body ->
-                let newEnv = extendEnv name (evalExpr newEnv value) dynEnv
-                in  evalExpr newEnv body     
+        Abs $ \staticEnv value ->
+            Abs $ \_ body ->
+                evalExpr staticEnv $
+                    List [mkSymbol "let", name,
+                        List [zcombE, List [mkSymbol "lambda", name, value]],
+                        body]
 
-letsV :: Term a
-letsV =
-    Abs $ \staticEnv defs ->
-        case defs of
-            List pairs ->
-                Abs $ \_ body ->
-                    let newEnv =
-                            foldl (\env (List [name, value]) ->
-                                        extendEnv name (evalExpr env value) env)
-                                    staticEnv pairs
-                    in  evalExpr newEnv body
-            _ -> error "defs: incorrect binding list"
+zcombE :: Expr
+zcombE =
+    let commonTerm = "(lambda x (f (lambda v (x x v))))"
+    in  fromRight (List []) . parseExpr . T.pack
+            $ "(lambda f (" ++ commonTerm ++ " " ++ commonTerm ++ "))"
 
-letrecsV :: Term a
-letrecsV =
-    Abs $ \_ defs ->
-        case defs of
-            List pairs ->
-                Abs $ \dynEnv body ->
-                    let newEnv =
-                            foldl (\env (List [name, value]) ->
-                                        extendEnv name (evalExpr env value) env)
-                                    dynEnv pairs
-                    in  evalExpr newEnv body
-            _ -> error "defs: incorrect binding list"
+-- letsV :: Term a
+-- letsV =
+--     Abs $ \staticEnv defs ->
+--         case defs of
+--             List pairs ->
+--                 Abs $ \_ body ->
+--                     let newEnv =
+--                             foldl (\env (List [name, value]) ->
+--                                         extendEnv name (evalExpr env value) env)
+--                                     staticEnv pairs
+--                     in  evalExpr newEnv body
+--             _ -> error "defs: incorrect binding list"
+
+-- letrecsV :: Term a
+-- letrecsV =
+--     Abs $ \_ defs ->
+--         case defs of
+--             List pairs ->
+--                 Abs $ \dynEnv body ->
+--                     let newEnv =
+--                             foldl (\env (List [name, value]) ->
+--                                         extendEnv name (evalExpr env value) env)
+--                                     dynEnv pairs
+--                     in  evalExpr newEnv body
+--             _ -> error "defs: incorrect binding list"
 
 mathVal
     :: (Num n, RealFrac n) => (a -> n) -> (n -> a) -> (n -> n -> n) -> Term a
@@ -106,18 +128,12 @@ mathVal toNum fromNum op =
                     _ -> error "Not a number"
             _ -> error "Not a number"
 
-trueVal :: Term a
-trueVal = Abs $ \_ x -> Abs $ \env _ -> evalExpr env x
-
-falseVal :: Term a
-falseVal = Abs $ \_ _ -> Abs $ \env y -> evalExpr env y
-
 eqVal :: Eq a => Term a
 eqVal = Abs $ \_ e1 -> Abs $ \env e2 ->
     case evalExpr env e1 of
             Val x ->
                 case evalExpr env e2 of
-                    Val y -> if x == y then trueVal else falseVal
+                    Val y -> if x == y then trueV else falseV
                     _ -> error "Not a value"
             _ -> error "Not a value"
 
