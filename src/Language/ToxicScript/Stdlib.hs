@@ -12,11 +12,24 @@ import Language.ToxicScript.Env
 import Language.ToxicScript.Expr
 import Language.ToxicScript.Parse
 
+import Debug.Trace
+
 fromCode :: Env (Term a) -> String -> String -> (Expr, Term a)
 fromCode env name t =
     case parseExpr . T.pack $ t of
         Left e -> error e
         Right v -> (mkSymbol name, evalExpr env v)
+
+-- expressions
+--   destructure: cons? empty? head tail
+--   evaluate:    eval
+
+-- * / + - e pi
+-- < > <= >= = true false
+-- lambda
+-- let letrec
+-- if not and or
+-- list cons nth map length filter
 
 mkGlobalEnv
     :: (Num n, RealFrac n, Eq a)
@@ -26,29 +39,113 @@ mkGlobalEnv
 mkGlobalEnv fromRat fromText toNum fromNum =
     extendEnvMany (stringsAndNumbers (Val . fromRat) (Val . fromText))
         [ (mkSymbol "lambda",   lambdaV)
+        , (mkSymbol "let-many", letManyV)
         , (mkSymbol "let",      letV)
-        , (mkSymbol "letrec",   letrecV)
+
+        , (mkSymbol "eq?",      eqVal)
         , (mkSymbol "true",     trueV)
         , (mkSymbol "false",    falseV)
 
-        -- , addValue "list"       listTr
-        -- , addValue "cons"       consTr
+        , (mkSymbol "+",        mathVal toNum fromNum (+))
+        , (mkSymbol "*",        mathVal toNum fromNum (*))
+        , (mkSymbol "-",        mathVal toNum fromNum (-))
+        , (mkSymbol "/",        mathVal toNum fromNum (/))
         
-        -- , addValue "map"        mapTr
-        -- , addValue "nth"        $ nthTr (round . toNum)
-        -- , addValue "if"         $ ifTr toBool
-        , (mkSymbol "+",    mathVal toNum fromNum (+))
-        , (mkSymbol "*",    mathVal toNum fromNum (*))
-        , (mkSymbol "-",    mathVal toNum fromNum (-))
-        , (mkSymbol "/",    mathVal toNum fromNum (/))
-        , (mkSymbol "=",    eqVal)
+        , (mkSymbol "pi",       Val $ fromNum 3.141592653589)
+        , (mkSymbol "e",        Val $ fromNum 2.718281828459)
 
-        , (mkSymbol "pi",   Val $ fromNum 3.141592653589)
-        , (mkSymbol "e",    Val $ fromNum 2.718281828459)
+        , (mkSymbol "empty?",   isEmptyV)
         ]
 
-vauV :: Term a
-vauV = undefined
+isEmptyV :: Term a
+isEmptyV =
+    Abs $ \env lst ->
+        case evalExpr env lst of
+            Var (List []) -> trueV
+            _ -> falseV
+
+{-
+; letrec name value body = let name (Z (lambda name value)) body
+(let letrec
+    (vau name
+        (vau value
+            (vau body
+                (let Z (lambda f (lambda x (f (lambda v (x x v))))
+                                 (lambda x (f (lambda v (x x v)))))
+                    (subst name (Z (eval value) body))
+                )
+            )
+        )
+    )
+)
+
+; uses: vau eval list? empty? head tail
+(letrec list
+    (vau arg
+        ((list? arg)
+            ((empty? arg)
+                ()
+                (cons (eval (head arg)) (list (tail arg)))
+            )
+            (cons arg ())
+        )
+    )
+)
+
+(letrec map
+    (lambda fn
+        (lambda lst
+            ((empty? lst)
+                lst
+                (cons (fn (head lst)) (map fn (tail lst)))
+            )
+        )
+    )
+)
+
+(letrec nth
+    (lambda n
+        (lambda lst
+            ((eq? n 0)
+                (head lst)
+                (nth (- n 1) (tail lst))
+            )
+        )
+    )
+)
+
+(letrec length
+    (lambda lst
+        ((empty? lst)
+            0
+            (+ 1 (length (tail lst))))
+    )
+)
+-}
+
+listV :: Term a
+listV =
+    Abs $ \env lst ->
+        case lst of
+            List [] -> Var $ List []
+            List (x:xs) ->
+                evalExpr env $
+                    List [mkSymbol "cons", x, List (mkSymbol "list" : xs)]
+            Atom atom ->
+                evalExpr env $ List [mkSymbol "cons", Atom atom, List []]
+
+consV :: Term a
+consV =
+    Abs $ \_ a -> Abs $ \_ b -> Abs $ \env f -> evalExpr env $ List [f, a, b]
+
+fstV :: Term a
+fstV = Abs $ \env p -> evalExpr env $ List [p, mkSymbol "true"]
+
+sndV :: Term a
+sndV = Abs $ \env p -> evalExpr env $ List [p, mkSymbol "false"]
+
+ifV :: Term a
+ifV = Abs $ \env cond -> evalExpr env cond
 
 lambdaV :: Term a
 lambdaV = Abs $ \_ name -> Abs $ \staticEnv body -> Abs $ \dynEnv value ->
@@ -75,21 +172,45 @@ falseV :: Term a
 falseV = Abs $ \_ _ -> Abs $ \env y -> evalExpr env y
 
 -- letrec name value body = let name (Z (lambda name value)) body
-letrecV :: Term a
-letrecV =
-    Abs $ \_ name ->
-        Abs $ \staticEnv value ->
-            Abs $ \_ body ->
-                evalExpr staticEnv $
-                    List [mkSymbol "let", name,
-                        List [zcombE, List [mkSymbol "lambda", name, value]],
-                        body]
+-- letrecV :: Term a
+-- letrecV =
+--     Abs $ \_ name ->
+--         Abs $ \staticEnv value ->
+--             Abs $ \_ body ->
+--                 evalExpr staticEnv $
+--                     List [mkSymbol "let", name,
+--                         List [zcombE, List [mkSymbol "lambda", name, value]],
+--                         body]
 
 zcombE :: Expr
 zcombE =
     let commonTerm = "(lambda x (f (lambda v (x x v))))"
     in  fromRight (List []) . parseExpr . T.pack
             $ "(lambda f (" ++ commonTerm ++ " " ++ commonTerm ++ "))"
+
+letManyV :: Term a
+letManyV =
+    Abs $ \staticEnv defs ->
+        case defs of
+            List pairs ->
+                Abs $ \_ body ->
+                    let expr =
+                            -- foldl
+                            --     (\b (List [name, value]) ->
+                            --         List [List [mkSymbol "let", name,
+                            --             List [zcombE,
+                            --                 List [mkSymbol "lambda", name,
+                            --                         value]]], b])
+                            --     body pairs
+                            foldr
+                                (\(List [name, value]) b ->
+                                    List [List [mkSymbol "let", name,
+                                        List [zcombE,
+                                            List [mkSymbol "lambda", name,
+                                                    value]]], b])
+                                body pairs
+                    in  traceShow expr $ evalExpr staticEnv expr
+            _ -> error "defs: incorrect binding list"
 
 -- letsV :: Term a
 -- letsV =

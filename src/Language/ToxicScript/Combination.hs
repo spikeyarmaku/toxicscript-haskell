@@ -2,7 +2,7 @@ module Language.ToxicScript.Combination where
 
 import Language.ToxicScript.Expr
 
-data CompoundExpr = Atomic Symbol | Combination Expr Expr
+data CompoundExpr = Empty | Atomic Symbol | Combination Expr Expr
 
 getCombiner :: Expr -> Either String Expr
 getCombiner (List xs) | not (null xs) = Right . List $ init xs
@@ -19,7 +19,7 @@ getCombination expr =
     in  case com of
             Left _ ->
                 case sym of
-                    Left _ -> error "Impossible"
+                    Left _ -> Empty -- error $ "Impossible: " ++ show expr
                     Right s -> Atomic s
             Right (c, p) -> Combination c p
 

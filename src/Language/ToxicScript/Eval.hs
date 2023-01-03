@@ -10,11 +10,22 @@ data Term a
     | Abs (Env (Term a) -> Expr -> Term a)  -- Lambda abstraction
     -- Application is handled explicitly by the syntax (see `evalExpr` and
     -- `apply`)
+    -- Furthermore, `App t1 t2` cannot be written, as `Abs` handles syntax as
+    -- well as semantics, therefore an expression cannot readily be compiled
+    -- into a `Term`. Consider e.g. a `let`-binding, where the first argument
+    -- must not be evaluated, but needs to be treated as a name.
+    -- Important note: the environment cannot be a first-class object, since
+    -- it doesn't even exist from the viewpoint of semantics - it is just an
+    -- optimization technique.
+
+-- emptyTerm = ()
+emptyTerm :: Term a
+emptyTerm = Var (List [])
 
 showTerm :: Show a => Term a -> String
-showTerm (Val a)        = "<<Value: " ++ show a ++ ">>"
-showTerm (Var v)        = "<<Variable: " ++ show v ++ ">>"
-showTerm (Abs _)      = "<<Abstraction>>"
+showTerm (Val a)    = "<<Value: " ++ show a ++ ">>"
+showTerm (Var v)    = "<<Variable: " ++ show v ++ ">>"
+showTerm (Abs _)    = "<<Abstraction>>"
 
 instance Show (Term a) where
     show = defaultPrint
@@ -40,13 +51,16 @@ eval _ (Abs f) = Abs f
 
 apply :: Env (Term a) -> Term a -> Expr -> Term a
 apply env (Abs f) v = f env v
-apply env t1 t2 = apply env (eval env t1) t2
+-- apply env t1 t2 = apply env (eval env t1) t2 -- It causes an infinite loop
+                                                -- in certain cases, like (1 2)
+apply _ t1 t2 = error $ "Cannot apply " ++ show t1 ++ " to " ++ show t2
 
 evalExpr :: Env (Term a) -> Expr -> Term a
 evalExpr env x =
     case lookupEnv env x of
         Nothing ->
             case getCombination x of
+                Empty -> emptyTerm
                 Atomic sym -> error $ "Unassigned variable: " ++ show sym
                 Combination c p ->
                     case c of
