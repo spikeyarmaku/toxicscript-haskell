@@ -1,11 +1,11 @@
     ; Static scoping test - should return 1
-; (let
-;     (
-;         (x 1)
-;         (f (lambda y x))
-;         (x 2)
-;     )
-;     (f 0)
-; )
+(let-many
+    (
+        (x 1)
+        (f (lambda y x))
+        (x 2)
+    )
+    (f 0)
+)
 
-(let x 1 (let f (lambda y x) (let x 2 (f 0))))
+; (let x 1 (let f (lambda y x) (let x 2 (f 0))))

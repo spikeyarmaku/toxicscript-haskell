@@ -50,10 +50,9 @@ eval env (Var v) =
 eval _ (Abs f) = Abs f
 
 apply :: Env (Term a) -> Term a -> Expr -> Term a
+apply _   (Val _) _ = error "Cannot use value as a function"
+apply env (Var v) e = apply env (eval env (Var v)) e
 apply env (Abs f) v = f env v
--- apply env t1 t2 = apply env (eval env t1) t2 -- It causes an infinite loop
-                                                -- in certain cases, like (1 2)
-apply _ t1 t2 = error $ "Cannot apply " ++ show t1 ++ " to " ++ show t2
 
 evalExpr :: Env (Term a) -> Expr -> Term a
 evalExpr env x =

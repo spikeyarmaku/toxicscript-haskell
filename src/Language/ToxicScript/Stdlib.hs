@@ -12,7 +12,7 @@ import Language.ToxicScript.Env
 import Language.ToxicScript.Expr
 import Language.ToxicScript.Parse
 
-import Debug.Trace
+-- import Debug.Trace
 
 fromCode :: Env (Term a) -> String -> String -> (Expr, Term a)
 fromCode env name t =
@@ -55,7 +55,26 @@ mkGlobalEnv fromRat fromText toNum fromNum =
         , (mkSymbol "e",        Val $ fromNum 2.718281828459)
 
         , (mkSymbol "empty?",   isEmptyV)
+
+        , (mkSymbol "list",     listV)
+        -- , (mkSymbol "eval",     evalV)
         ]
+
+-- evalV :: Term a
+-- evalV = Abs $ \env e -> evalExpr env e
+
+-- The cool thing about this list definition is that we use "cons" without it
+-- being defined beforehands. It shall be defined in the standard lib
+-- (stdlib.txc in this case), and thanks to `let-many`'s late binding, it will
+-- work. And it is statically scoped (check scoping.txc).
+listV :: Term a
+listV =
+    Abs $ \env lst ->
+        case lst of
+            Atom _ -> evalExpr env $ List [mkSymbol "cons", lst, List []]
+            List xs ->
+                evalExpr env $
+                    foldr (\x expr -> List [mkSymbol "cons", x, expr]) (List []) xs
 
 isEmptyV :: Term a
 isEmptyV =
@@ -123,16 +142,16 @@ isEmptyV =
 )
 -}
 
-listV :: Term a
-listV =
-    Abs $ \env lst ->
-        case lst of
-            List [] -> Var $ List []
-            List (x:xs) ->
-                evalExpr env $
-                    List [mkSymbol "cons", x, List (mkSymbol "list" : xs)]
-            Atom atom ->
-                evalExpr env $ List [mkSymbol "cons", Atom atom, List []]
+-- listV :: Term a
+-- listV =
+--     Abs $ \env lst ->
+--         case lst of
+--             List [] -> Var $ List []
+--             List (x:xs) ->
+--                 evalExpr env $
+--                     List [mkSymbol "cons", x, List (mkSymbol "list" : xs)]
+--             Atom atom ->
+--                 evalExpr env $ List [mkSymbol "cons", Atom atom, List []]
 
 consV :: Term a
 consV =
@@ -195,13 +214,6 @@ letManyV =
             List pairs ->
                 Abs $ \_ body ->
                     let expr =
-                            -- foldl
-                            --     (\b (List [name, value]) ->
-                            --         List [List [mkSymbol "let", name,
-                            --             List [zcombE,
-                            --                 List [mkSymbol "lambda", name,
-                            --                         value]]], b])
-                            --     body pairs
                             foldr
                                 (\(List [name, value]) b ->
                                     List [List [mkSymbol "let", name,
@@ -209,7 +221,7 @@ letManyV =
                                             List [mkSymbol "lambda", name,
                                                     value]]], b])
                                 body pairs
-                    in  traceShow expr $ evalExpr staticEnv expr
+                    in  evalExpr staticEnv expr
             _ -> error "defs: incorrect binding list"
 
 -- letsV :: Term a
