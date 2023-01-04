@@ -51,7 +51,13 @@ eval _ (Abs f) = Abs f
 
 apply :: Env (Term a) -> Term a -> Expr -> Term a
 apply _   (Val _) _ = error "Cannot use value as a function"
-apply env (Var v) e = apply env (eval env (Var v)) e
+apply env (Var v) e =
+    case eval env (Var v) of
+        Var v' ->
+            if v == v'
+                then error $ "Cannot evaluate variable " ++ show v
+                else apply env (Var v') e
+        x -> apply env x e
 apply env (Abs f) v = f env v
 
 evalExpr :: Env (Term a) -> Expr -> Term a

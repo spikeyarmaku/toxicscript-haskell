@@ -28,6 +28,7 @@ evalFile fp = do
     ast <- withHandler $ parseExpr (T.pack expr)
     -- putStrLn $ showExpr ast
     case evalExpr globalEnv (withStdlib ast) of
+    -- case evalExpr globalEnv ast of
         Val x -> print x
         Var x -> putStrLn $ "Variable " ++ show x
         Abs _ -> putStrLn "Abstraction"

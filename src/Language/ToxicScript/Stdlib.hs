@@ -71,7 +71,7 @@ stdlibExpr = fromRight (mkSymbol "error") . parseExpr . T.pack $
             \(if\
                 \(lambda cond\
                     \(lambda ifTrue (lambda ifFalse (cond ifTrue ifFalse)))))\
-            \(map (lambda fn (lambda lst (cons (fn (fst lst)) (map fn (tail lst))))))\
+            \(map (lambda fn (lambda lst ((empty? lst) lst (cons (fn (fst lst)) (map fn (tail lst)))))))\
             \(length (lambda lst ((empty? lst) 0 (+ 1 (length (tail lst))))))\
             \(nth (lambda n (lambda lst (((eq? n 0) (head lst) (nth (- n 1) (tail lst)))))))\
         \)\
@@ -91,7 +91,8 @@ listV =
             Atom _ -> evalExpr env $ List [mkSymbol "cons", lst, List []]
             List xs ->
                 evalExpr env $
-                    foldr (\x expr -> List [mkSymbol "cons", x, expr]) (List []) xs
+                    foldr (\x expr -> List [mkSymbol "cons", x, expr])
+                        (List []) xs
 
 isEmptyV :: Term a
 isEmptyV =
@@ -99,19 +100,6 @@ isEmptyV =
         case evalExpr env lst of
             Var (List []) -> trueV
             _ -> falseV
-
-consV :: Term a
-consV =
-    Abs $ \_ a -> Abs $ \_ b -> Abs $ \env f -> evalExpr env $ List [f, a, b]
-
-fstV :: Term a
-fstV = Abs $ \env p -> evalExpr env $ List [p, mkSymbol "true"]
-
-sndV :: Term a
-sndV = Abs $ \env p -> evalExpr env $ List [p, mkSymbol "false"]
-
-ifV :: Term a
-ifV = Abs $ \env cond -> evalExpr env cond
 
 lambdaV :: Term a
 lambdaV = Abs $ \_ name -> Abs $ \staticEnv body -> Abs $ \dynEnv value ->
@@ -158,7 +146,7 @@ letManyV =
                                                     value]]], b])
                                 body pairs
                     in  evalExpr staticEnv expr
-            _ -> error "defs: incorrect binding list"
+            _ -> error "let-many: incorrect binding list"
 
 mathVal
     :: (Num n, RealFrac n) => (a -> n) -> (n -> a) -> (n -> n -> n) -> Term a
