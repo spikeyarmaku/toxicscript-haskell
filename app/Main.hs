@@ -16,8 +16,8 @@ import Language.ToxicScript.Stdlib
 
 main :: IO ()
 main = do
-    -- evalFile "test/sandbox.txc"
-    evalFile "test/stdlib.txc"
+    evalFile "test/sandbox.txc"
+    -- evalFile "test/stdlib.txc"
     -- files <- listDirectory "test"
     -- mapM_ (withCurrentDirectory "test" . evalFile) files
 
@@ -27,7 +27,7 @@ evalFile fp = do
     putStrLn $ "\n--- EVALUATING " ++ show fp ++ " ---\n"
     ast <- withHandler $ parseExpr (T.pack expr)
     -- putStrLn $ showExpr ast
-    case evalExpr globalEnv ast of
+    case evalExpr globalEnv (withStdlib ast) of
         Val x -> print x
         Var x -> putStrLn $ "Variable " ++ show x
         Abs _ -> putStrLn "Abstraction"

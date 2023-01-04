@@ -60,6 +60,29 @@ mkGlobalEnv fromRat fromText toNum fromNum =
         -- , (mkSymbol "eval",     evalV)
         ]
 
+withStdlib :: Expr -> Expr
+withStdlib code = List [stdlibExpr, code]
+
+stdlibExpr :: Expr
+stdlibExpr = fromRight (mkSymbol "error") . parseExpr . T.pack $
+    "(let-many\
+        \(\
+            \(first  (lambda x (lambda y x)))\
+            \(second (lambda x (lambda y y)))\
+            \(cons   (lambda x (lambda y (lambda f (f x y)))))\
+            \(fst    (lambda p (p first)))\
+            \(snd    (lambda p (p second)))\
+            \(head fst)\
+            \(tail snd)\
+            \(if\
+                \(lambda cond\
+                    \(lambda ifTrue (lambda ifFalse (cond ifTrue ifFalse)))))\
+            \(map (lambda fn (lambda lst (cons (fn (fst lst)) (map fn (tail lst))))))\
+            \(length (lambda lst ((empty? lst) 0 (+ 1 (length (tail lst))))))\
+            \(nth (lambda n (lambda lst (((eq? n 0) (head lst) (nth (- n 1) (tail lst)))))))\
+        \)\
+    \)"
+
 -- evalV :: Term a
 -- evalV = Abs $ \env e -> evalExpr env e
 

@@ -14,10 +14,7 @@
             (lambda cond
                 (lambda ifTrue (lambda ifFalse (cond ifTrue ifFalse)))))
         (map (lambda fn (lambda lst (cons (fn (fst lst)) (map fn (tail lst))))))
-        ; (empty? (lambda lst (eq? lst ())))
         (length (lambda lst ((empty? lst) 0 (+ 1 (length (tail lst))))))
         (nth (lambda n (lambda lst (((eq? n 0) (head lst) (nth (- n 1) (tail lst)))))))
     )
-
-    (length (list (1 2 3 4 5)))
 )
