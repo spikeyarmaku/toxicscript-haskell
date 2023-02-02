@@ -6,7 +6,7 @@ import Language.ToxicScript.Env
 
 data Term a
     = Val a                                 -- User-defined value
-    | Var Expr                              -- Variable
+    | Exp Expr                              -- Expression (variable or code)
     | Abs (Env (Term a) -> Expr -> Term a)  -- Lambda abstraction
     -- Application is handled explicitly by the syntax (see `evalExpr` and
     -- `apply`)
@@ -20,11 +20,11 @@ data Term a
 
 -- emptyTerm = ()
 emptyTerm :: Term a
-emptyTerm = Var (List [])
+emptyTerm = Exp (List [])
 
 showTerm :: Show a => Term a -> String
 showTerm (Val a)    = "<<Value: " ++ show a ++ ">>"
-showTerm (Var v)    = "<<Variable: " ++ show v ++ ">>"
+showTerm (Exp v)    = "<<Expression: " ++ show v ++ ">>"
 showTerm (Abs _)    = "<<Abstraction>>"
 
 instance Show (Term a) where
@@ -32,7 +32,7 @@ instance Show (Term a) where
 
 defaultPrint :: Term a -> [Char]
 defaultPrint (Val _) = "Val _"
-defaultPrint (Var v) = "Var " ++ show v
+defaultPrint (Exp v) = "Exp " ++ show v
 defaultPrint (Abs _) = "Abs"
 
 data Result a
@@ -43,20 +43,20 @@ data Result a
 
 eval :: Env (Term a) -> Term a -> Term a
 eval _ (Val a) = Val a
-eval env (Var v) =
+eval env (Exp v) =
     case lookupEnv env v of
-        Nothing -> Var v
+        Nothing -> Exp v
         Just x -> x
 eval _ (Abs f) = Abs f
 
 apply :: Env (Term a) -> Term a -> Expr -> Term a
 apply _   (Val _) _ = error "Cannot use value as a function"
-apply env (Var v) e =
-    case eval env (Var v) of
-        Var v' ->
+apply env (Exp v) e =
+    case eval env (Exp v) of
+        Exp v' ->
             if v == v'
-                then error $ "Cannot evaluate variable " ++ show v
-                else apply env (Var v') e
+                then error $ "Cannot evaluate expression " ++ show v
+                else apply env (Exp v') e
         x -> apply env x e
 apply env (Abs f) v = f env v
 

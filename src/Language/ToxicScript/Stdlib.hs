@@ -98,7 +98,7 @@ isEmptyV :: Term a
 isEmptyV =
     Abs $ \env lst ->
         case evalExpr env lst of
-            Var (List []) -> trueV
+            Exp (List []) -> trueV
             _ -> falseV
 
 lambdaV :: Term a

@@ -30,7 +30,7 @@ evalFile fp = do
     case evalExpr globalEnv (withStdlib ast) of
     -- case evalExpr globalEnv ast of
         Val x -> print x
-        Var x -> putStrLn $ "Variable " ++ show x
+        Exp x -> putStrLn $ "Variable " ++ show x
         Abs _ -> putStrLn "Abstraction"
 
 helpMessage :: String -> String
