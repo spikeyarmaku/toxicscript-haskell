@@ -18,6 +18,19 @@ data Term a
     -- it doesn't even exist from the viewpoint of semantics - it is just an
     -- optimization technique.
 
+-- Usage: instead of writing `Abs $ \_ p1 -> Abs $ \ p2 -> Abs $ \env p3 -> ...`
+-- one can write `mkMultiAbs 3 $ \env [p1, p2, p3] -> ...`
+mkMultiAbs :: Int -> (Env (Term a) -> [Expr] -> Term a) -> Term a
+mkMultiAbs n
+    | n > 0 = mkMultiAbs' [] n
+    | otherwise = const $ Exp (List [])
+mkMultiAbs' :: [Expr] -> Int -> (Env (Term a) -> [Expr] -> Term a) -> Term a
+mkMultiAbs' exprs 1 f = Abs $ \env p -> f env (reverse $ p:exprs)
+mkMultiAbs' exprs n f = Abs $ \_ p -> mkMultiAbs' (p:exprs) (n - 1) f
+
+-- mkMultiAbs 1 $ \env [p1] -> ... === Abs $ \env p1 -> ...
+-- mkMultiAbs 2 $ \env [p1, p2] -> ... === Abs $ \_ p1 -> Abs $ \env p2 -> ...
+
 -- emptyTerm = ()
 emptyTerm :: Term a
 emptyTerm = Exp (List [])

@@ -1,0 +1,5 @@
+- REPL with lib:
+cabal repl lib:toxicscript
+
+- REPL with test:
+cabal repl exe:toxicscript-test
